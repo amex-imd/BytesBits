@@ -411,7 +411,7 @@ namespace IMD
     void fill_one_bit(T &val)
     {
         auto ptr = reinterpret_cast<std::byte *>(&val);
-        size_t bytes = byte_amount<T>();
+        size_t bytes = bytes_number<T>();
         std::byte max = std::byte((1 << BITS_PER_BYTE) - 1);
 
         std::fill(ptr, ptr + bytes, max);
@@ -421,10 +421,32 @@ namespace IMD
     void fill_zero_bit(T &val)
     {
         auto ptr = reinterpret_cast<std::byte *>(&val);
-        size_t bytes = byte_amount<T>();
+        size_t bytes = bytes_number<T>();
 
         std::fill(ptr, ptr + bytes, std::byte(0));
     }
+
+    template <typename T>
+    size_t zero_bit_number(const T &val)
+    {
+        auto ptr = reinterpret_cast<const byte *>(&val);
+        size_t res(0);
+        size_t bytes = bytes_number<T>();
+
+        for (size_t i(bytes); i-- > 0;)
+            for (size_t j(BITS_PER_BYTE); j-- > 0;)
+                if (((static_cast<unsigned char>(ptr[i]) >> j) & 1) == 0)
+                    ++res;
+
+        return res;
+    }
+
+    template <typename T>
+    size_t one_bit_number(const T &val)
+    {
+        return bits_number<T>() - zero_bit_number(val);
+    }
+
 }
 
 #endif
