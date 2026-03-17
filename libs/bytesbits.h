@@ -118,7 +118,7 @@ namespace IMD
             auto ptr = reinterpret_cast<std::byte *>(&val);
 
             size_t byte_ind = bytes_number<T>() - 1 - bit_ind / BITS_PER_BYTE;
-            size_t bit_ind_in_byte = bit_ind % BITS_PER_BYTE;
+            size_t bit_ind_in_byte = BITS_PER_BYTE - 1 - bit_ind % BITS_PER_BYTE;
 
             unsigned char byte_val = static_cast<unsigned char>(ptr[byte_ind]);
 
@@ -197,7 +197,180 @@ namespace IMD
 
             return res;
         }
+    }
 
+    namespace LITTLE_ENDIAN
+    {
+        // PRINT METHODS
+
+        template <typename T>
+        void print_bits(const T &val, const char *sep = " ", std::ostream &os = std::cout)
+        {
+            auto ptr = reinterpret_cast<const std::byte *>(&val);
+            auto bytes = bytes_number<T>();
+
+            for (size_t i(0); i < bytes; ++i)
+            {
+                for (size_t j(BITS_PER_BYTE); j-- > 0;)
+                    os << (static_cast<int>(ptr[i] >> j) & 1);
+                os << sep;
+            }
+        }
+
+        template <typename T>
+        void print_bin_bytes(const T &val, const char *sep = " ", std::ostream &os = std::cout)
+        {
+            auto ptr = reinterpret_cast<const std::byte *>(&val);
+            auto bytes = bytes_number<T>();
+
+            for (size_t i(0); i < bytes; ++i)
+            {
+                os << "0b";
+                for (size_t j(BITS_PER_BYTE); j-- > 0;)
+                    os << (static_cast<int>(ptr[i] >> j) & 1);
+                if (i != bytes - 1)
+                    os << sep;
+            }
+        }
+
+        template <typename T>
+        void print_oct_bytes(const T &val, const char *sep = " ", std::ostream &os = std::cout)
+        {
+            auto ptr = reinterpret_cast<const std::byte *>(&val);
+            auto bytes = bytes_number<T>();
+
+            for (size_t i(0); i < bytes; ++i)
+            {
+                os << "0o" << std::setw(3) << std::setfill('0') << std::oct << static_cast<int>(ptr[i]);
+                if (i != bytes - 1)
+                    os << sep;
+            }
+            os << std::dec;
+        }
+
+        template <typename T>
+        void print_dec_bytes(const T &val, const char *sep = " ", std::ostream &os = std::cout)
+        {
+            auto ptr = reinterpret_cast<const std::byte *>(&val);
+            auto bytes = bytes_number<T>();
+
+            for (size_t i(0); i < bytes; ++i)
+            {
+                os << std::dec << static_cast<int>(ptr[i]);
+                if (i != bytes - 1)
+                    os << sep;
+            }
+        }
+
+        template <typename T>
+        void print_hex_bytes(const T &val, const char *sep = " ", std::ostream &os = std::cout)
+        {
+            auto ptr = reinterpret_cast<const std::byte *>(&val);
+            auto bytes = bytes_number<T>();
+
+            for (size_t i(0); i < bytes; ++i)
+            {
+                os << "0x" << std::setw(2) << std::setfill('0') << std::hex << static_cast<int>(ptr[i]);
+                if (i != bytes - 1)
+                    os << sep;
+            }
+            os << std::dec;
+        }
+
+        // MODIFY METHODS
+
+        template <typename T>
+        void modify_bit(T &val, size_t bit_ind, bool bit_val)
+        {
+            if (bit_ind >= bits_number<T>())
+                throw std::out_of_range("The bit index is out of range");
+
+            auto ptr = reinterpret_cast<std::byte *>(&val);
+
+            size_t byte_ind = bit_ind / BITS_PER_BYTE;
+            size_t bit_ind_in_byte = BITS_PER_BYTE - 1 - bit_ind % BITS_PER_BYTE;
+
+            unsigned char byte_val = static_cast<unsigned char>(ptr[byte_ind]);
+
+            if (bit_val)
+                byte_val |= (1 << bit_ind_in_byte);
+            else
+                byte_val &= ~(1 << bit_ind_in_byte);
+
+            ptr[byte_ind] = static_cast<std::byte>(byte_val);
+        }
+        template <typename T>
+        void set_bit(T &val, size_t bit_ind)
+        {
+            modify_bit(val, bit_ind, 1);
+        }
+
+        template <typename T>
+        void reset_bit(T &val, size_t bit_ind)
+        {
+            modify_bit(val, bit_ind, 0);
+        }
+        template <typename T>
+        bool get_bit(const T &val, size_t bit_ind)
+        {
+            if (bit_ind >= bits_number<T>())
+                throw std::out_of_range("The bit index is out of range");
+
+            auto ptr = reinterpret_cast<const std::byte *>(&val);
+            size_t byte_ind = bit_ind / BITS_PER_BYTE;
+            size_t bit_ind_in_byte = bit_ind % BITS_PER_BYTE;
+
+            return (static_cast<int>(ptr[byte_ind]) >> bit_ind_in_byte) & 1;
+        }
+
+        // RESTORE METHODS
+
+        template <typename T, typename InputIt>
+        T restore_value_from_bytes(InputIt beg, InputIt end)
+        {
+            if (std::distance(beg, end) != bytes_number<T>())
+                throw std::runtime_error("The number of elements in the range does not match the size of the type T");
+
+            T res;
+            auto ptr = reinterpret_cast<std::byte *>(&res);
+            size_t ind(0);
+
+            while (beg != end)
+            {
+                ptr[ind] = static_cast<std::byte>(*beg);
+                ++ind;
+                ++beg;
+            }
+
+            return res;
+        }
+        template <typename T, typename InputIt>
+        T restore_value_from_bits(InputIt beg, InputIt end)
+        {
+            if (std::distance(beg, end) != bits_number<T>())
+                throw std::runtime_error("The number of bits does not match the size of type T");
+
+            T res = 0;
+            size_t bit_ind = 0;
+
+            while (beg != end)
+            {
+                bool bit_val = static_cast<bool>(*beg);
+
+                if (bit_val)
+                {
+                    size_t byte = bit_ind / BITS_PER_BYTE;
+                    size_t bit = BITS_PER_BYTE - 1 - bit_ind % BITS_PER_BYTE;
+
+                    res |= (static_cast<T>(1) << (byte * BITS_PER_BYTE + bit));
+                }
+
+                ++bit_ind;
+                ++beg;
+            }
+
+            return res;
+        }
     }
 
 }
